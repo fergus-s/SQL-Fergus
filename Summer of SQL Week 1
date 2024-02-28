@@ -1,0 +1,56 @@
+// Identify the first witness
+
+SELECT * FROM person 
+WHERE address_street_name = 'Northwestern Dr' 
+ORDER BY address_number DESC LIMIT 1;
+
+// Identify the second witness
+
+SELECT * FROM person 
+WHERE name like '%Annabel%'
+AND address_street_name = 'Franklin Ave';
+
+// Their interview scripts
+
+select person.name, interview.person_id, interview.transcript
+from interview
+join person
+on interview.person_id = person.id
+where person.name = 'Annabel Miller' 
+or person.name = 'Morty Schapiro'
+
+// Find the murderer
+
+select * from  get_fit_now_check_in
+join get_fit_now_member
+on get_fit_now_check_in.membership_id = get_fit_now_member.id
+where check_in_date like '%0109'
+and membership_id like '48Z%'
+and membership_status = 'gold'
+
+select * from person
+join drivers_license
+on drivers_license.id = person.license_id
+where plate_number like '%H42W%'
+
+// Find the real culprit
+
+select * from interview
+where person_id = '67318'
+
+select * from person
+join drivers_license
+on drivers_license.id = person.license_id
+join facebook_event_checkin
+on person.id = facebook_event_checkin.person_id
+where hair_color = 'red'
+and car_make = 'Tesla'
+and car_model = 'Model S'
+and gender = 'female'
+and event_name = 'SQL Symphony Concert'
+
+
+
+
+
+
