@@ -70,6 +70,7 @@ PD2023_WK02_TRANSACTIONS.account_number, PD2023_WK02_TRANSACTIONS.BANK
 from PD2023_WK02_TRANSACTIONS
 join PD2023_WK02_SWIFT_CODES 
 on PD2023_WK02_TRANSACTIONS.bank = PD2023_WK02_SWIFT_CODES.bank */
+
 // Output
 select 
 PD2023_WK02_TRANSACTIONS.transaction_id, 'GB' as Country_Code, PD2023_WK02_SWIFT_CODES.check_digits,
@@ -80,5 +81,119 @@ PD2023_WK02_SWIFT_CODES.swift_code || '' || replace(sort_code,'-', '') || '' || 
 from PD2023_WK02_TRANSACTIONS
 join PD2023_WK02_SWIFT_CODES 
 on PD2023_WK02_TRANSACTIONS.bank = PD2023_WK02_SWIFT_CODES.bank
+
+// Preppin Data 2023 wk3
+For the transactions file:
+Filter the transactions to just look at DSB (help)
+These will be transactions that contain DSB in the Transaction Code field
+Rename the values in the Online or In-person field, Online of the 1 values and In-Person for the 2 values
+Change the date to be the quarter (help)
+Sum the transaction values for each quarter and for each Type of Transaction (Online or In-Person) (help)
+For the targets file:
+Pivot the quarterly targets so we have a row for each Type of Transaction and each Quarter (help)
+ Rename the fields
+Remove the 'Q' from the quarter field and make the data type numeric (help)
+Join the two datasets together (help)
+You may need more than one join clause!
+Remove unnecessary fields
+Calculate the Variance to Target for each row (help)
+
+//All Steps
+
+WITH CTE AS (
+select 
+--LEFT(transaction_code,charindex('-',transaction_code)-1) as bank,
+case online_or_in_person
+when 1 then 'Online'
+when 2 then 'In-Person'
+end as online_in_person,
+--(replace((LEFT(transaction_date,10)),'/','-'))
+DATE_PART('quarter',DATE(LEFT(transaction_date,10),'dd/MM/yyyy')) as quarter,
+sum(value) as total_value
+from PD2023_WK01
+where SPLIT_PART(transaction_code,'-',1) = 'DSB'
+group by 
+online_or_in_person,
+quarter
+)
+
+select Online_or_in_person, 
+replace(t.quarter,'Q','')::int as quarter, 
+v.total_value,
+target,
+v.total_value - target as variance
+from PD2023_WK03_TARGETS as T
+UNPIVOT(target FOR quarter IN (Q1, Q2, Q3, Q4))
+INNER JOIN CTE as V 
+on T.online_or_in_person = v.online_in_person and replace(t.quarter,'Q','')::int = V.quarter
+
+// Preppin Data 2023 wk4
+
+We want to stack the tables on top of one another, since they have the same fields in each sheet. We can do this one of 2 ways (help):
+Drag each table into the canvas and use a union step to stack them on top of one another
+Use a wildcard union in the input step of one of the tables
+Some of the fields aren't matching up as we'd expect, due to differences in spelling. Merge these fields together
+Make a Joining Date field based on the Joining Day, Table Names and the year 2023
+Now we want to reshape our data so we have a field for each demographic, for each new customer (help)
+Make sure all the data types are correct for each field
+Remove duplicates (help)
+If a customer appears multiple times take their earliest joining date
+Output the data
+
+//Output
+
+with CTE as (
+select *, 'January' as table_name
+FROM PD2023_WK04_JANUARY UNION ALL 
+select *, 'February' as table_name
+FROM PD2023_WK04_FEBRUARY UNION ALL 
+select *, 'March' as table_name
+FROM PD2023_WK04_MARCH UNION ALL 
+select *, 'April' as table_name
+FROM PD2023_WK04_APRIL UNION ALL 
+select *, 'May' as table_name
+FROM PD2023_WK04_MAY UNION ALL 
+select *, 'June' as table_name
+FROM PD2023_WK04_JUNE UNION ALL 
+select *, 'July' as table_name
+FROM PD2023_WK04_JULY UNION ALL 
+select *, 'August' as table_name
+FROM PD2023_WK04_AUGUST UNION ALL 
+select *, 'September' as table_name
+FROM PD2023_WK04_SEPTEMBER UNION ALL 
+select *, 'October' as table_name
+FROM PD2023_WK04_OCTOBER UNION ALL
+select *, 'November' as table_name
+FROM PD2023_WK04_NOVEMBER UNION ALL
+select *, 'December' as table_name
+FROM PD2023_WK04_DECEMBER)
+
+, PRE_PIVOT AS (
+select 
+id,
+date_from_parts(2023,DATE_PART('month',DATE(table_name,'MMMM')),joining_day) as joining_date,
+demographic,
+value
+from CTE
+)
+, POST_PIVOT AS (
+select 
+id,
+joining_date,
+ethnicity,
+Account_Type,
+Date_of_Birth::date,
+ROW_NUMBER() OVER(PARTITION BY id ORDER BY joining_date ASC) as rn
+--If a customer appears multiple times take their earliest joining date (line above)
+FROM PRE_PIVOT
+PIVOT(MAX(value) FOR demographic IN ('Ethnicity','Account Type','Date of Birth')) AS P
+(id,
+joining_date,
+ethnicity,
+Account_Type,
+Date_of_Birth))
+SELECT * 
+from post_pivot
+where rn = 1
 
 
