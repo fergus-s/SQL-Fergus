@@ -1,0 +1,129 @@
+----PIZZA----
+A. Pizza Metrics
+How many pizzas were ordered?
+
+select 
+count (pizza_id)
+from CUSTOMER_ORDERS
+
+How many unique customer orders were made?
+
+select 
+ count (distinct customer_id)
+from CUSTOMER_ORDERS
+
+How many successful orders were delivered by each runner?
+
+select runner_id,
+count (distinct co.order_id) as successful_orders
+from CUSTOMER_ORDERS CO
+join runner_orders RO
+on co.order_id = ro.order_id
+WHERE pickup_time<>'null' 
+group by runner_id
+
+How many of each type of pizza was delivered?
+
+select pizza_name,
+count (distinct co.order_id) as successful_orders
+from CUSTOMER_ORDERS CO
+join runner_orders RO on co.order_id = ro.order_id
+JOIN pizza_names as pn on co.pizza_id = pn.pizza_id
+WHERE pickup_time<>'null' 
+group by pizza_name
+
+How many Vegetarian and Meatlovers were ordered by each customer?
+
+select customer_id,
+pizza_name,
+count (distinct co.order_id) as orders
+from CUSTOMER_ORDERS CO
+join runner_orders RO on co.order_id = ro.order_id
+JOIN pizza_names as pn on co.pizza_id = pn.pizza_id
+WHERE pickup_time<>'null' 
+group by pizza_name, customer_id
+
+What was the maximum number of pizzas delivered in a single order?
+
+select co.order_id,
+count (co.pizza_id) as pizzas
+from CUSTOMER_ORDERS CO
+join runner_orders RO on co.order_id = ro.order_id
+JOIN pizza_names as pn on co.pizza_id = pn.pizza_id
+WHERE pickup_time<>'null'
+group by co.order_id
+order by pizzas DESC
+limit 1
+
+For each customer, how many delivered pizzas had at least 1 change and how many had no changes?
+
+select customer_id,
+SUM(CASE 
+    WHEN 
+        (
+          (exclusions IS NOT NULL AND exclusions<>'null' AND LENGTH(exclusions)>0) 
+        AND (extras IS NOT NULL AND extras<>'null' AND LENGTH(extras)>0)
+        )=TRUE
+    THEN 1 
+    ELSE 0
+  END) as changes, 
+  SUM(CASE 
+    WHEN 
+        (
+          (exclusions IS NOT NULL AND exclusions<>'null' AND LENGTH(exclusions)>0) 
+        AND (extras IS NOT NULL AND extras<>'null' AND LENGTH(extras)>0)
+        )=TRUE
+    THEN 0 
+    ELSE 1
+  END) as no_changes 
+from CUSTOMER_ORDERS CO
+join runner_orders RO on co.order_id = ro.order_id
+WHERE pickup_time<>'null'
+group by co.customer_id
+
+How many pizzas were delivered that had both exclusions and extras?
+
+select count(pizza_id)
+from CUSTOMER_ORDERS CO
+join runner_orders RO on co.order_id = ro.order_id
+WHERE pickup_time<>'null'
+and
+ (exclusions IS NOT NULL AND exclusions<>'null' AND LENGTH(exclusions)>0) 
+        AND (extras IS NOT NULL AND extras<>'null' AND LENGTH(extras)>0)
+
+What was the total volume of pizzas ordered for each hour of the day?
+
+select 
+date_part('hour', order_time) as hour,
+count(pizza_id)
+from CUSTOMER_ORDERS CO
+join runner_orders RO on co.order_id = ro.order_id
+group by hour
+
+What was the volume of orders for each day of the week?
+
+select 
+  DAYNAME(order_time) as day,
+count(distinct co.order_id) as order_per_day
+from CUSTOMER_ORDERS CO
+group by day
+
+----RUNNERS----
+B. Runner and Customer Experience
+How many runners signed up for each 1 week period? (i.e. week starts 2021-01-01)
+
+select date_trunc('week', registration_date) + 4 as week,
+count(ro.runner_id)
+from runner_orders as ro
+join  runners as r on  ro.runner_id = r.runner_id
+group by week
+
+What was the average time in minutes it took for each runner to arrive at the Pizza Runner HQ to pickup the order?
+
+
+
+Is there any relationship between the number of pizzas and how long the order takes to prepare?
+What was the average distance travelled for each customer?
+What was the difference between the longest and shortest delivery times for all orders?
+What was the average speed for each runner for each delivery and do you notice any trend for these values?
+What is the successful delivery percentage for each runner?
