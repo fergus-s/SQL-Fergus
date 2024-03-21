@@ -1,0 +1,75 @@
+// 1. How many customers has Foodie-Fi ever had?
+
+select 
+distinct count(customer_id)
+from subscriptions
+
+// 2. What is the monthly distribution of trial plan start_date values for our dataset - use the start of the month as the group by value
+
+select start_date,
+plan_id
+from subscriptions
+where plan_id = 0
+group by start_date, plan_id
+
+// 3. What plan start_date values occur after the year 2020 for our dataset? Show the breakdown by count of events for each plan_name
+
+select count(start_date) as event_count,
+plan.plan_name
+from subscriptions as sub
+join plans as plan on sub.plan_id = plan.plan_id
+where start_date > '2020-01-01'
+group by plan.plan_name, event_count
+
+// 4. What is the customer count and percentage of customers who have churned rounded to 1 decimal place?
+
+select distinct count(start_date) as customer_count,
+plan.plan_name,
+ROUND(((customer_count * 100) / sum(customer_count) over()),1) as percent_of_total
+from subscriptions as sub
+join plans as plan on sub.plan_id = plan.plan_id
+group by plan.plan_name
+
+// 5. How many customers have churned straight after their initial free trial - what percentage is this rounded to the nearest whole number?
+
+WITH CTE AS (
+SELECT 
+customer_id,
+plan_name,
+ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY start_date ASC) as rn
+FROM subscriptions as sub
+jOIN plans as plan on sub.plan_id = plan.plan_id
+)
+SELECT 
+COUNT(DISTINCT customer_id) as churn_customers,
+ROUND((COUNT(DISTINCT customer_id) / (SELECT COUNT(DISTINCT customer_id) FROM subscriptions))*100,0) as percent_of_total
+FROM CTE
+WHERE rn = 2
+AND plan_name = 'churn';
+
+// 6. What is the number and percentage of customer plans after their initial free trial?
+
+WITH CTE AS (
+SELECT 
+customer_id,
+plan_name,
+FROM subscriptions as sub
+jOIN plans as plan on sub.plan_id = plan.plan_id
+),
+CTE2 AS (
+SELECT 
+customer_id,
+plan.plan_name,
+FROM subscriptions as sub
+jOIN plans as plan on sub.plan_id = plan.plan_id
+where plan.plan_name <> 'trial' and plan.plan_name <> 'churn'
+)
+SELECT 
+COUNT(DISTINCT customer_id) as plan_customers,
+ROUND((COUNT(DISTINCT customer_id) / (SELECT COUNT(DISTINCT customer_id) FROM CTE))*100,0) as percent_of_total
+FROM CTE2
+
+// 7. What is the customer count and percentage breakdown of all 5 plan_name values at 2020-12-31?
+
+
+
