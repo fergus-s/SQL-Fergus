@@ -71,5 +71,107 @@ FROM CTE2
 
 // 7. What is the customer count and percentage breakdown of all 5 plan_name values at 2020-12-31?
 
+WITH CTE AS (
+SELECT *
+,ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY start_date DESC) as rn
+FROM subscriptions
+WHERE start_date <= '2020-12-31'
+)
+SELECT 
+plan_name,
+COUNT(customer_id) as customer_count,
+ROUND((COUNT(customer_id)/(SELECT COUNT(DISTINCT customer_id) FROM CTE))*100,1) as percent_of_cust
+FROM CTE
+join plans as plan on CTE.plan_id = plan.plan_id
+WHERE rn = 1
+group by plan_name
 
+// 8. How many customers have upgraded to an annual plan in 2020?
 
+WITH CTE AS (
+SELECT *
+,ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY start_date DESC) as rn
+FROM subscriptions
+WHERE start_date <= '2020-12-31'
+and start_date >= '2020-01-01'
+and plan_id = '3'
+)
+SELECT distinct count(customer_id)
+from CTE
+
+// 9. How many days on average does it take for a customer to an annual plan from the day they join Foodie-Fi?
+
+WITH trial_start AS (
+SELECT customer_id,
+start_date
+FROM subscriptions
+WHERE plan_id = '0'
+),
+annual_start AS (
+SELECT customer_id,
+start_date as annual_date
+FROM subscriptions
+WHERE plan_id = '3'
+),
+date_join as (
+SELECT trial.customer_id,
+DATEDIFF('day', start_date, annual_date) as daystoannual
+from trial_start as trial
+join annual_start as annual on trial.customer_id = annual.customer_id
+)
+Select avg(daystoannual) as avg_days
+from date_join
+
+// 10. Can you further breakdown this average value into 30 day periods (i.e. 0-30 days, 31-60 days etc)
+
+WITH trial_start AS (
+SELECT customer_id,
+start_date
+FROM subscriptions
+WHERE plan_id = '0'
+),
+annual_start AS (
+SELECT customer_id,
+start_date as annual_date
+FROM subscriptions
+WHERE plan_id = '3'
+),
+date_join as (
+SELECT trial.customer_id,
+DATEDIFF('day', start_date, annual_date) as daystoannual,
+case 
+when daystoannual >= 0 and daystoannual <=30 then '0-30 days'
+when daystoannual >= 31 and daystoannual <=60 then '31-60 days'
+else '60+ days' end as Periods
+from trial_start as trial
+join annual_start as annual on trial.customer_id = annual.customer_id
+)
+Select ROUND(avg(daystoannual),0) as avg_days,
+periods
+from date_join
+group by Periods
+
+// 11. How many customers downgraded from a pro monthly to a basic monthly plan in 2020?
+
+WITH PRO AS (
+SELECT customer_id,
+start_date as pro_monthly
+FROM subscriptions
+where plan_id = '2'
+),
+BASIC AS (
+SELECT customer_id,
+start_date as basic_monthly
+FROM subscriptions
+where plan_id = '1'
+and basic_monthly <= '2020-12-31'
+and basic_monthly >= '2020-01-01'
+),
+customer_join as (
+select pro.customer_id
+from pro
+join basic on pro.customer_id = basic.customer_id
+where pro_monthly < basic_monthly
+)
+select distinct count(customer_id)
+from customer_join
