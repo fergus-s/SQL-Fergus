@@ -1,0 +1,191 @@
+2023 WEEK 6 PREPPIN DATA
+
+Input the data
+Reshape the data so we have 5 rows for each customer, with responses for the Mobile App and Online Interface being in separate fields on the same row
+Clean the question categories so they don't have the platform in from of them
+e.g. Mobile App - Ease of Use should be simply Ease of Use
+Exclude the Overall Ratings, these were incorrectly calculated by the system
+Calculate the Average Ratings for each platform for each customer 
+Calculate the difference in Average Rating between Mobile App and Online Interface for each customer
+Catergorise customers as being:
+Mobile App Superfans if the difference is greater than or equal to 2 in the Mobile App's favour
+Mobile App Fans if difference >= 1
+Online Interface Fan
+Online Interface Superfan
+Neutral if difference is between 0 and 1
+Calculate the Percent of Total customers in each category, rounded to 1 decimal place
+Output the data
+
+
+with pre_pivot as (
+select
+customer_id,
+SPLIT_PART(pivot_columns,'___',1) as device,
+SPLIT_PART(pivot_columns,'___',2) as factor,
+value
+from
+(
+select * from PD2023_WK06_DSB_CUSTOMER_SURVEY
+) as dsb
+UNPIVOT (
+value FOR pivot_columns IN (MOBILE_APP___EASE_OF_USE, MOBILE_APP___EASE_OF_ACCESS, MOBILE_APP___NAVIGATION, MOBILE_APP___LIKELIHOOD_TO_RECOMMEND, MOBILE_APP___OVERALL_RATING, ONLINE_INTERFACE___EASE_OF_USE, ONLINE_INTERFACE___EASE_OF_ACCESS, ONLINE_INTERFACE___NAVIGATION, ONLINE_INTERFACE___LIKELIHOOD_TO_RECOMMEND, ONLINE_INTERFACE___OVERALL_RATING)
+) as pvt
+)
+, format_data as (
+select *
+from pre_pivot
+pivot (sum(value) for device in ('MOBILE_APP','ONLINE_INTERFACE')) as p
+where FACTOR <> 'OVERALL_RATING'
+)
+, customer_categories as (
+select customer_id,
+AVG("'MOBILE_APP'") as avg_mobile,
+AVG("'ONLINE_INTERFACE'") as avg_online,
+AVG("'MOBILE_APP'") - AVG("'ONLINE_INTERFACE'") as diff_in_ratings,
+case 
+when AVG("'MOBILE_APP'") - AVG("'ONLINE_INTERFACE'") >= 2 then 'Mobile App Superfan'
+when AVG("'MOBILE_APP'") - AVG("'ONLINE_INTERFACE'") >= 1 then 'Mobile App Fan'
+when AVG("'MOBILE_APP'") - AVG("'ONLINE_INTERFACE'") <= -2 then 'Online Interface Superfan'
+when AVG("'MOBILE_APP'") - AVG("'ONLINE_INTERFACE'") <= -1 then 'Online Interface Fan'
+else 'Neutral' end as Customer_Category
+from format_data
+group by customer_id
+)
+select customer_category,
+count(customer_id) as customers,
+(select count(customer_id) from customer_categories) as total_customer,
+ROUND(count(customer_id) / (select count(customer_id) from customer_categories)*100,1) as percent_total
+from customer_categories
+group by customer_category
+
+
+2023 WEEK 7 PREPPIN DATA
+
+For the Transaction Path table:
+Make sure field naming convention matches the other tables
+i.e. instead of Account_From it should be Account From
+For the Account Information table:
+Make sure there are no null values in the Account Holder ID
+Ensure there is one row per Account Holder ID
+Joint accounts will have 2 Account Holders, we want a row for each of them
+For the Account Holders table:
+Make sure the phone numbers start with 07
+Bring the tables together
+Filter out cancelled transactions 
+Filter to transactions greater than £1,000 in value 
+Filter out Platinum accounts
+
+
+WITH acc_info as (
+select account_number,
+account_type,
+value as account_holder_id,
+balance_date,
+balance
+from PD2023_WK07_ACCOUNT_INFORMATION, LATERAL split_to_table(account_holder_id,', ')
+where ACCOUNT_HOLDER_ID is not null
+)
+
+select  
+'0' || contact_number::varchar(20) as phone,
+*
+from PD2023_WK07_TRANSACTION_DETAIL as d
+join PD2023_WK07_TRANSACTION_PATH as p on d.transaction_id = p.transaction_id
+join acc_info on acc_info.account_number = p.account_from
+join PD2023_WK07_ACCOUNT_HOLDERS as h on h.account_holder_id = acc_info.account_holder_id
+where cancelled_ = 'N'
+and value > 1000
+and account_type <> 'Platinum'
+
+
+2023 WEEK 8 PREPPIN DATA
+
+Input each of the 12 monthly files
+Create a 'file date' using the month found in the file name
+The Null value should be replaced as 1
+Clean the Market Cap value to ensure it is the true value as 'Market Capitalisation'
+Remove any rows with 'n/a'
+Categorise the Purchase Price into groupings
+0 to 24,999.99 as 'Low'
+25,000 to 49,999.99 as 'Medium'
+50,000 to 74,999.99 as 'High'
+75,000 to 100,000 as 'Very High'
+Categorise the Market Cap into groupings
+Below $100M as 'Small'
+Between $100M and below $1B as 'Medium'
+Between $1B and below $100B as 'Large' 
+$100B and above as 'Huge'
+Rank the highest 5 purchases per combination of: file date, Purchase Price Categorisation and Market Capitalisation Categorisation.
+Output only records with a rank of 1 to 5
+
+
+with all_stock as (
+select *, 'January' as table_name
+FROM PD2023_WK08_01 UNION ALL 
+select *, 'February' as table_name
+FROM PD2023_WK08_02 UNION ALL 
+select *, 'March' as table_name
+FROM PD2023_WK08_03 UNION ALL 
+select *, 'April' as table_name
+FROM PD2023_WK08_04 UNION ALL 
+select *, 'May' as table_name
+FROM PD2023_WK08_05 UNION ALL 
+select *, 'June' as table_name
+FROM PD2023_WK08_06 UNION ALL 
+select *, 'July' as table_name
+FROM PD2023_WK08_07 UNION ALL 
+select *, 'August' as table_name
+FROM PD2023_WK08_08 UNION ALL 
+select *, 'September' as table_name
+FROM PD2023_WK08_09 UNION ALL 
+select *, 'October' as table_name
+FROM PD2023_WK08_10 UNION ALL
+select *, 'November' as table_name
+FROM PD2023_WK08_11 UNION ALL
+select *, 'December' as table_name
+FROM PD2023_WK08_12
+where MARKET_CAP <> 'n/a'
+),
+prep_stock as (
+select *,
+(((RIGHT(purchase_price, LEN(purchase_price) - 1))::FLOAT)) as p_price, 
+case
+when p_price <= 24999.99 then 'Low'
+when p_price <= 49999.99 then 'Medium'
+when p_price <= 74999.99 then 'High'
+else 'Very High' end as Purchase_group,
+case
+when contains(market_cap, 'B') then 1000000000
+when contains(market_cap, 'M') then 1000000
+else 0 end as multiply,
+((REGEXP_REPLACE(RIGHT(market_cap, LEN(market_cap) - 1),'[a-zA-Z]','')::FLOAT)) as m_cap,
+m_cap * multiply,
+case
+when m_cap <= 100000000 then 'Small'
+when m_cap <= 1000000000 then 'Medium'
+when m_cap <= 100000000000 then 'Large'
+else 'Huge' end as market_group
+from all_stock
+where MARKET_CAP <> 'n/a'
+),
+RankedData AS (
+    SELECT *,
+                RANK() OVER (PARTITION BY table_name, purchase_group, market_group ORDER BY p_price DESC) AS RowRank,
+           FROM 
+        prep_stock
+)
+SELECT 
+    market_group,
+    purchase_group,
+    table_name,
+    ticker,
+    sector,
+    market,
+    stock_name,
+    m_cap,
+    p_price,
+    rowrank
+FROM 
+    RankedData
+WHERE 
+    RowRank <= 5;
