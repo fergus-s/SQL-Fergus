@@ -1,0 +1,119 @@
+Lego Portfolio Project
+Part 1: Schema Setup 📥
+
+CREATE SCHEMA TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA
+
+CREATE TABLE TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_COLORS
+     (
+	ID NUMBER(38,0),
+	NAME VARCHAR(255),
+    RGB VARCHAR(255),
+    IS_TRANS VARCHAR(255)
+    );
+    CREATE TABLE TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_INVENTORIES
+     (
+	ID NUMBER(38,0),
+    VERSION_ NUMBER(38,0),
+	SET_NUM VARCHAR(255)
+    );
+    CREATE TABLE TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_INVENTORY_PARTS
+     (
+	INVENTORY_ID NUMBER(38,0),
+	PART_NUM VARCHAR(255),
+    COLOR_ID NUMBER(38,0),
+    QUANTITY NUMBER(38,0),
+    IS_SPARE VARCHAR(255)
+    );
+    CREATE TABLE TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_INVENTORY_SETS
+     (
+	INVENTORY_ID NUMBER(38,0),
+	SET_NUM VARCHAR(255),
+    QUANTITY NUMBER(38,0)
+    );
+CREATE TABLE TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_PARTS
+     (
+    PART_NUM VARCHAR(255),
+    NAME VARCHAR(255),
+	PART_CAT_ID NUMBER(38,0)    
+    );
+    CREATE TABLE TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_PART_CATEGORIES
+     (
+    ID NUMBER(38,0),
+    NAME VARCHAR(255)	    
+    );
+
+CREATE TABLE TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_SETS
+     (
+    SET_NUM VARCHAR(255),
+    NAME VARCHAR(255),
+	YEAR_ NUMBER(38,0),
+    THEME_ID NUMBER(38,0),
+    NUM_PARTS NUMBER(38,0)
+);
+   CREATE TABLE TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_THEMES
+     (
+    ID NUMBER(38,0),
+    NAME VARCHAR(255),
+    PARENT_ID NUMBER(38,0)
+    );
+
+INSERT INTO TIL_PORTFOLIO_PROJECTS.FERG_SCHEMA.LEGO_COLORS
+SELECT *
+FROM TIL_PORTFOLIO_PROJECTS.STAGING.LEGO_COLORS
+-- DO FOR ALL TABLES
+
+ALTER TABLE LEGO_COLORS ADD PRIMARY KEY (ID);
+ALTER TABLE LEGO_INVENTORIES ADD PRIMARY KEY (ID);
+ALTER TABLE LEGO_PARTS ADD PRIMARY KEY (PART_NUM);
+ALTER TABLE LEGO_PART_CATEGORIES ADD PRIMARY KEY (ID);
+ALTER TABLE LEGO_SETS ADD PRIMARY KEY (SET_NUM);
+ALTER TABLE LEGO_THEMES ADD PRIMARY KEY (ID);
+
+
+ALTER TABLE LEGO_INVENTORY_PARTS ADD FOREIGN KEY (INVENTORY_ID) REFERENCES LEGO_INVENTORIES(ID);
+ALTER TABLE LEGO_INVENTORY_PARTS ADD FOREIGN KEY (PART_NUM) REFERENCES LEGO_PARTS(PART_NUM);
+ALTER TABLE LEGO_INVENTORY_PARTS ADD FOREIGN KEY (COLOR_ID) REFERENCES LEGO_COLORS(ID);
+
+ALTER TABLE LEGO_PARTS ADD FOREIGN KEY (PART_CAT_ID) REFERENCES LEGO_PART_CATEGORIES(ID);
+
+ALTER TABLE LEGO_INVENTORY_SETS ADD FOREIGN KEY (INVENTORY_ID) REFERENCES LEGO_INVENTORIES(ID);
+ALTER TABLE LEGO_INVENTORY_SETS ADD FOREIGN KEY (SET_NUM) REFERENCES LEGO_SETS(SET_NUM);
+
+ALTER TABLE LEGO_SETS ADD FOREIGN KEY (THEME_ID) REFERENCES LEGO_THEMES(ID);
+
+ALTER TABLE LEGO_INVENTORIES ADD FOREIGN KEY (SET_NUM) REFERENCES LEGO_SETS(SET_NUM);
+
+
+Part 2: Analysis of Lego Sets 🔮
+
+
+CREATE VIEW unique_sets AS 
+WITH unique_parts as (
+select parts.part_num,
+parts.name,
+count(distinct inv.set_num) as parts_unique
+from LEGO_PARTS as parts
+join lego_part_categories as part_cat on parts.part_cat_id = part_cat.id
+join lego_inventory_parts as inv_parts on inv_parts.part_num = parts.part_num
+join lego_inventories as inv on inv.id = inv_parts.inventory_id
+
+group by parts.part_num, parts.name
+having count(distinct inv.set_num) = 1
+)
+
+
+select SETS.name,
+SETS.year_,
+themes.name as theme_name,
+count(unique_parts.part_num) as distinct_parts, 
+count(parts.name) as parts,
+count(unique_parts.part_num)/count(parts.name) as unique_ratio 
+from lego_parts as parts
+inner join lego_part_categories as part_cat on parts.part_cat_id = part_cat.id
+inner join lego_inventory_parts as inv_parts on inv_parts.part_num = parts.part_num
+inner join lego_inventories as inv on inv.id = inv_parts.inventory_id
+inner join lego_sets as sets on sets.set_num = inv.set_num
+left join lego_themes as themes on themes.id = sets.theme_id
+left join unique_parts on unique_parts.part_num = parts.part_num
+group by sets.name, sets.year_, 
+themes.name
