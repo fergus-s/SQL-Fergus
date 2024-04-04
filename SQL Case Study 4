@@ -1,0 +1,185 @@
+// Case Study #4
+A. Customer Nodes Exploration
+// 1. How many unique nodes are there on the Data Bank system?
+
+select count(distinct node_id) as unique_notes
+from customer_nodes
+
+// 2. What is the number of nodes per region?
+
+select region_name,
+count(node_id) as node_count
+from regions as r
+join customer_nodes as cn on r.region_id = cn.region_id
+group by region_name
+
+// 3. How many customers are allocated to each region?
+
+select region_name,
+count(distinct customer_id) as cust_count
+from regions as r
+join customer_nodes as cn on r.region_id = cn.region_id
+group by region_name
+
+// 4. How many days on average are customers reallocated to a different node?
+
+with days_in_node as
+(
+select customer_id, node_id,
+sum(datediff('days', start_date, end_date)) as node_days
+from customer_nodes 
+where end_date <> '9999-12-31'
+group by customer_id, node_id
+)
+select 
+round(avg(node_days),1) as avg_node_days
+from days_in_node
+
+// 5. What is the median, 80th and 95th percentile for this same reallocation days metric for each region?
+
+WITH days_in_node AS (
+    SELECT 
+        region_name, 
+        customer_id, 
+        node_id, 
+        SUM(DATEDIFF('days', start_date, end_date)) AS node_days
+    FROM 
+        customer_nodes AS cn
+    JOIN 
+        regions AS r ON r.region_id = cn.region_id
+    WHERE 
+        end_date <> '9999-12-31'
+    GROUP BY 
+        region_name, customer_id, node_id
+)
+
+SELECT
+    region_name,
+    round(PERCENTILE_CONT(0.5),0) WITHIN GROUP (ORDER BY node_days ASC) AS median_value,
+    round(PERCENTILE_CONT(0.8),0) WITHIN GROUP (ORDER BY node_days ASC) AS percentile_80_value,
+    round(PERCENTILE_CONT(0.95),0) WITHIN GROUP (ORDER BY node_days ASC) AS percentile_95_value
+FROM
+    days_in_node
+GROUP BY
+    region_name;
+
+B. Customer Transactions
+// 1. What is the unique count and total amount for each transaction type?
+
+select txn_type,
+count(distinct txn_amount) as count,
+sum(txn_amount) as total_amount
+from customer_transactions
+group by txn_type
+
+// 2. What is the average total historical deposit counts and amounts for all customers?
+
+with transactions_total as
+(
+select customer_id,
+count(distinct txn_amount) as count,
+sum(txn_amount) as total_amount
+from customer_transactions 
+where txn_type = 'desposit'
+group by customer_id
+)
+select avg(count),
+avg(total_amount)
+from transactions_total
+
+// 3. For each month - how many Data Bank customers make more than 1 deposit and either 1 purchase or 1 withdrawal in a single month?
+
+with deposit as (
+select customer_id,
+date_part('month', txn_date) as month,
+sum(
+case when txn_type = 'deposit' then 1 else 0 end) as deposits,
+sum(
+case when txn_type <> 'deposit' then 1 else 0 end) as not_deposit
+from customer_transactions 
+group by month, customer_id
+having deposits > 1
+and not_deposit = 1
+)
+select month,
+count(customer_id) as customers
+from deposit
+group by month
+
+// 4. What is the closing balance for each customer at the end of the month?
+
+with deposit as (
+select 
+date_trunc('month', txn_date) as month,
+txn_date,
+customer_id,
+SUM((CASE WHEN txn_type ='deposit' THEN txn_amount ELSE 0 END) - (CASE WHEN txn_type <>'deposit' THEN txn_amount ELSE 0 END)) as balance
+from customer_transactions 
+group by month, customer_id, txn_date
+),
+running_totals as (
+select *,
+SUM(balance) OVER (PARTITION BY customer_id ORDER BY txn_date) AS running_total,
+ROW_NUMBER() OVER (PARTITION BY customer_id, month ORDER BY txn_date DESC) as rn
+from deposit
+order by txn_date
+)
+select customer_id,
+DATEADD('day',-1,DATEADD('month',1,month)) as last_of_month,
+running_total
+FROM running_totals 
+WHERE rn = 1
+
+// 5. What is the percentage of customers who increase their closing balance by more than 5%?
+
+with deposit as (
+select 
+date_trunc('month', txn_date) as month,
+txn_date,
+customer_id,
+SUM((CASE WHEN txn_type ='deposit' THEN txn_amount ELSE 0 END) - (CASE WHEN txn_type <>'deposit' THEN txn_amount ELSE 0 END)) as balance
+from customer_transactions 
+group by month, customer_id, txn_date
+),
+running_totals as (
+select *,
+SUM(balance) OVER (PARTITION BY customer_id ORDER BY txn_date) AS running_total,
+ROW_NUMBER() OVER (PARTITION BY customer_id, month ORDER BY txn_date DESC) as rn
+from deposit
+order by txn_date
+),
+closing_balance as (
+select customer_id,
+DATEADD('day',-1,DATEADD('month',1,month)) as last_of_month,
+dateadd('day',-1,month) as prev_last_of_month,
+running_total
+FROM running_totals 
+WHERE rn = 1
+order by last_of_month
+),
+percentage as (
+select
+CB1.customer_id,
+CB1.last_of_month,
+CB1.running_total,
+CB2.running_total as next_month_closing_balance,
+(CB2.running_total / CB1.running_total) -1 as percentage_increase,
+CASE WHEN (CB2.running_total > CB1.running_total AND 
+(CB2.running_total / CB1.running_total) -1 > 0.05) THEN 1 ELSE 0 END as percentage_increase_flag
+from closing_balance as CB1
+JOIN closing_balance as CB2 on CB1.last_of_month = CB2.prev_last_of_month 
+AND CB1.customer_id = CB2.customer_id
+WHERE CB1.running_total <> 0
+)
+SELECT 
+round(SUM(percentage_increase_flag) / COUNT(percentage_increase_flag) ,1) as percentage_of_customers_increasing_balance
+FROM percentage
+
+
+
+
+
+
+
+
+
