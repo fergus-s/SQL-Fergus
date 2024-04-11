@@ -1,0 +1,166 @@
+Summer of SQL Week 7 - Preppin Data 2023 Weeks 9-12
+
+// 2023: Week 9 - Customer Bank Statements
+For the Transaction Path table:
+Make sure field naming convention matches the other tables
+i.e. instead of Account_From it should be Account From
+Filter out the cancelled transactions
+Split the flow into incoming and outgoing transactions 
+Bring the data together with the Balance as of 31st Jan 
+Work out the order that transactions occur for each account
+Hint: where multiple transactions happen on the same day, assume the highest value transactions happen first
+Use a running sum to calculate the Balance for each account on each day (hint)
+The Transaction Value should be null for 31st Jan, as this is the starting balance
+
+with account_to_table as (
+select account_to as account_num,
+transaction_date,
+value,
+balance
+from pd2023_wk07_transaction_path as tp
+join PD2023_WK07_TRANSACTION_DETAIL as td on tp.transaction_id = td.transaction_id
+join PD2023_WK07_ACCOUNT_INFORMATION as ai on tp.account_to = ai.account_number
+where cancelled_ <> 'Y'
+and balance_date = '2023-01-31'
+
+
+union all 
+
+select account_to as account_num,
+transaction_date,
+value * (-1) as value,
+balance
+from pd2023_wk07_transaction_path as tp
+join PD2023_WK07_TRANSACTION_DETAIL as td on tp.transaction_id = td.transaction_id
+join PD2023_WK07_ACCOUNT_INFORMATION as ai on tp.account_from = ai.account_number
+where cancelled_ <> 'Y'
+and balance_date = '2023-01-31'
+
+union all
+
+select account_number as account_num,
+balance_date as transaction_date,
+NULL as value,
+balance
+from PD2023_WK07_ACCOUNT_INFORMATION
+
+)
+
+// 2023: Week 10 Preppin Data
+Aggregate the data so we have a single balance for each day already in the dataset, for each account
+Scaffold the data so each account has a row between 31st Jan and 14th Feb (hint)
+Make sure new rows have a null in the Transaction Value field
+Create a parameter so a particular date can be selected
+Filter to just this date
+
+
+with week10input as (
+with account_to_table as (
+select account_to as account_num,
+transaction_date,
+value,
+balance
+from pd2023_wk07_transaction_path as tp
+join PD2023_WK07_TRANSACTION_DETAIL as td on tp.transaction_id = td.transaction_id
+join PD2023_WK07_ACCOUNT_INFORMATION as ai on tp.account_to = ai.account_number
+where cancelled_ <> 'Y'
+and balance_date = '2023-01-31'
+
+
+union all 
+
+select account_to as account_num,
+transaction_date,
+value * (-1) as value,
+balance
+from pd2023_wk07_transaction_path as tp
+join PD2023_WK07_TRANSACTION_DETAIL as td on tp.transaction_id = td.transaction_id
+join PD2023_WK07_ACCOUNT_INFORMATION as ai on tp.account_from = ai.account_number
+where cancelled_ <> 'Y'
+and balance_date = '2023-01-31'
+
+union all
+
+select account_number as account_num,
+balance_date as transaction_date,
+NULL as value,
+balance
+from PD2023_WK07_ACCOUNT_INFORMATION
+
+)
+
+select account_num,
+transaction_date,
+value,
+SUM(COALESCE(value,0)) OVER(PARTITION BY account_num ORDER BY transaction_date, value DESC) + balance as balance
+from account_to_table
+order by account_num, transaction_date, value DESC
+)
+, DAILY_TRANSACTIONS as (
+select account_num,
+transaction_date,
+sum(balance) as balance
+from week10input
+group by account_num, transaction_date
+)
+,single_balance as (
+select *, ROW_NUMBER() OVER(PARTITION by account_num, transaction_date order by value ASC) as rn
+from week10input
+)
+, daily_balance as (
+select sb.account_num,
+sb.transaction_date,
+value,
+dt.balance
+from single_balance as sb
+join daily_transactions as dt on dt.account_num = sb.account_num and dt.transaction_date = sb. transaction_date
+where rn = 1
+)
+, account_numbers AS (
+SELECT DISTINCT 
+account_num
+FROM daily_balance
+)
+,numbers AS (
+SELECT '2023-01-31'::date as d,
+account_num 
+FROM account_numbers
+
+union all
+
+select dateadd('day' ,1,d),
+account_num
+from numbers
+where d < '2023-02-14'::date 
+)
+,
+daily_table as (
+select
+n.account_num,
+n.d as transaction_date,
+db.value,
+db.balance as balance2,
+sb.transaction_date as transaction_date2,
+sb.balance,
+datediff('day' ,sb.transaction_date,n.d) as date_diff,
+ROW_NUMBER() OVER(PARTITION BY n.account_num,n.d ORDER BY datediff('day',sb.transaction_date,n.d)) as rn
+from numbers as n
+left join daily_balance as db on n.account_num = db.account_num and n.d = db.transaction_date
+join single_balance as sb on sb.account_num = n.account_num and sb.transaction_date <= n.d
+order by n.account_num, n.d
+)
+
+select account_num,
+transaction_date,
+value,
+balance
+from daily_table
+where rn = 1
+
+
+select account_num,
+transaction_date,
+value,
+SUM(COALESCE(value,0)) OVER(PARTITION BY account_num ORDER BY transaction_date, value DESC) + balance as balance
+from account_to_table
+order by account_num, transaction_date, value DESC;
