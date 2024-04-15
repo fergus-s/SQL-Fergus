@@ -164,3 +164,19 @@ value,
 SUM(COALESCE(value,0)) OVER(PARTITION BY account_num ORDER BY transaction_date, value DESC) + balance as balance
 from account_to_table
 order by account_num, transaction_date, value DESC;
+
+// Week 11 Preppin Data
+
+
+select customer,
+branch,
+MIN(ROUND(ST_DISTANCE(
+    ST_POINT(address_long, address_lat),
+    ST_POINT(branch_long, branch_lat)),2
+    )) as distance,
+    ROW_NUMBER() OVER(PARTITION BY customer ORDER BY distance ASC) as customer_priority
+from PD2023_WK11_DSB_CUSTOMER_LOCATIONS as C
+join PD2023_WK11_DSB_BRANCHES as B 
+group by customer, branch;
+
+
