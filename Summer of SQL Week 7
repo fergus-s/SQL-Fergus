@@ -180,3 +180,42 @@ join PD2023_WK11_DSB_BRANCHES as B
 group by customer, branch;
 
 
+// Week 12 Preppin Data
+
+
+with CTE as (
+select *,
+NULLIF(YEAR, '') AS YEAR2,
+count(YEAR2) over (order by ROW_NUM) as _grp
+from PD2023_WK12_UK_BANK_HOLIDAYS
+), CTE2 as (
+select DATE, BANK_HOLIDAY, _grp,
+ first_value(YEAR2) over (partition by _grp order by ROW_NUM) as filled_YEAR,
+ concat(DATE, '-',filled_year) as full_date 
+ from CTE
+ ),
+ BH as (
+ select bank_holiday, 
+ TO_DATE(FULL_DATE, 'DD-Mon-YYYY') AS bh_date
+ from CTE2 
+ where DATE <> ''
+)
+, UK as (
+select new_customers,
+TO_DATE(DATE, 'DD/MM/YYYY') AS new_date
+from PD2023_WK12_NEW_CUSTOMERS
+)
+select *,
+DAYNAME(NEW_DATE) AS day_of_week,
+case
+when bank_holiday is null AND  
+ (DAYNAME(NEW_DATE) NOT IN ('Sat', 'Sun'))
+    THEN 1
+    ELSE 0
+END AS Reporting_Day
+from UK
+left Join BH on uk.new_date = bh.bh_date
+
+
+
+
