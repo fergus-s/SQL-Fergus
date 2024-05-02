@@ -183,6 +183,7 @@ group by customer, branch;
 // Week 12 Preppin Data
 
 
+
 with CTE as (
 select *,
 NULLIF(YEAR, '') AS YEAR2,
@@ -204,7 +205,8 @@ select DATE, BANK_HOLIDAY, _grp,
 select new_customers,
 TO_DATE(DATE, 'DD/MM/YYYY') AS new_date
 from PD2023_WK12_NEW_CUSTOMERS
-)
+), 
+UKBH as (
 select *,
 DAYNAME(NEW_DATE) AS day_of_week,
 case
@@ -215,6 +217,126 @@ when bank_holiday is null AND
 END AS Reporting_Day
 from UK
 left Join BH on uk.new_date = bh.bh_date
+) , no_reporting as (
+select distinct
+NEW_DATE as non_report_date
+from UKBH
+where reporting_day = 0
+)
+, reporting_lookup as (
+select non_report_date,
+min(NEW_DATE) as next_report_date
+from UKBH 
+inner join no_reporting as nr on nr.non_report_date < ukbh.new_date
+where reporting_day = 1
+group by non_report_date
+)
+, uk_report as (
+select coalesce(next_report_date,new_date) as date,
+monthname(coalesce(next_report_date,new_date)) || '-' || YEAR(coalesce(next_report_date,new_date)) as month,
+sum(new_customers) as new_customers
+from UKBH 
+left join reporting_lookup as rl on rl.non_report_date = UKBH.new_date
+group by 1,2
+)
+, UK_last_day as (
+select month,
+max(date) as last_date
+from uk_report
+group by month
+)
+, uk_report_adj as (
+select case
+        when last_date is null then monthname(date) || '-' || year(date)
+        else monthname(DATEADD('month',1,date)) || '-' || YEAR(DATEADD('month',1,date))
+END as reporting_month,
+date,
+ROW_NUMBER() OVER(PARTITION BY 
+(CASE 
+WHEN last_date IS NULL THEN MONTHNAME(date) || '-' || YEAR(date)
+ELSE MONTHNAME(DATEADD('month',1,date)) || '-' || YEAR(DATEADD('month',1,date))
+END) ORDER BY date
+) as reporting_day,
+new_customers as uk_new_customers
+from uk_report as uk
+left join UK_last_day as l on uk.date = l.last_date
+where date < '2023-12-31'
+)
+,ROI_DATA AS (
+SELECT 
+reporting_month as roi_reporting_month,
+reporting_day as roi_reporting_day,
+new_customers as roi_new_customers,
+DATE(reporting_date,'DD/MM/YYYY') as roi_reporting_date
+FROM pd2023_wk12_roi_new_customers
+)
+,MATCHING_UK_DATES AS (
+SELECT 
+reporting_month,
+reporting_day,
+date as reporting_date,
+uk_new_customers,
+COALESCE(roi_new_customers,0) as roi_new_customers,
+roi_reporting_month
+FROM UK_REPORT_ADJ as UK
+LEFT JOIN ROI_DATA as ROI on UK.date = ROI.roi_reporting_date
+)
+,ROI_DATA_ADJ AS (
+SELECT 
+roi_reporting_month,
+roi_reporting_day,
+roi_new_customers,
+roi_reporting_date,
+MIN(UK2.date) as next_uk_date
+FROM ROI_DATA as ROI
+LEFT JOIN UK_REPORT_ADJ as UK on UK.date = ROI.roi_reporting_date
+LEFT JOIN UK_REPORT_ADJ as UK2 on UK2.date > ROI.roi_reporting_date
+WHERE UK.date IS NULL
+GROUP BY 
+roi_reporting_month,
+roi_reporting_day,
+roi_new_customers,
+roi_reporting_date
+)
+,COMBINED AS (
+SELECT 
+reporting_month,
+reporting_day,
+date as reporting_date,
+0 as uk_new_customers,
+roi_new_customers,
+roi_reporting_month
+FROM ROI_DATA_ADJ as ROI
+INNER JOIN UK_REPORT_ADJ as UK on UK.date = ROI.next_uk_date
+
+UNION ALL
+
+SELECT *
+FROM MATCHING_UK_DATES
+)
+SELECT 
+CASE 
+WHEN roi_reporting_month IS NULL THEN 'x'
+WHEN LEFT(reporting_month,3) <> LEFT(roi_reporting_month,3) THEN 'x'
+ELSE '' 
+END as misalignment_flag,
+reporting_month,
+reporting_day,
+reporting_date,
+SUM(uk_new_customers) as uk_new_customers,
+SUM(roi_new_customers) as roi_new_customers,
+roi_reporting_month
+FROM COMBINED
+GROUP BY 
+CASE 
+WHEN roi_reporting_month IS NULL THEN 'x'
+WHEN LEFT(reporting_month,3) <> LEFT(roi_reporting_month,3) THEN 'x'
+ELSE '' 
+END,
+reporting_month,
+reporting_day,
+reporting_date,
+roi_reporting_month;
 
 
 
