@@ -1,0 +1,22 @@
+1. Create Your Database/Schema
+
+CREATE DATABASE olympics;
+
+2. Create a Staging Table
+
+create table Olympicstable3
+(ID int,
+'Name' varchar(255),
+'Sex' varchar(255),
+'Age' int);
+etc....
+
+3. Insert Data
+
+**Snipped**
+INSERT INTO `olympicstable3` (`ID`,`Name`,`Sex`,`Age`,`Height`,`Weight`,`Team`,`NOC`,`Games`,`Year`,`Season`,`City`,`Sport`,`Event`,`Medal`)
+VALUES
+(1,'A Dijiang','M',24,180,80,'China','CHN','1992 Summer',1992,'Summer','Barcelona','Basketball','Basketball Men''s Basketball',NULL),
+(2,'A Lamusi','M',23,170,60,'China','CHN','2012 Summer',2012,'Summer','London','Judo','Judo Men''s Extra-Lightweight',NULL),
+(5,'Christine Jacoba Aaftink','F',21,185,82,'Netherlands','NED','1988 Winter',1988,'Winter','Calgary','Speed Skating','Speed Skating Women''s 500 metres',NULL),
+(5,'Christine Jacoba Aaftink','F',21,185,82,'Netherlands','NED','1988 Winter',1988,'Winter','Calgary','Speed Skating','Speed Skating Women''s 1,000 metres',NULL),
