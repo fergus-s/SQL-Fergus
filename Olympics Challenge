@@ -33,3 +33,93 @@ VALUES
 (2,'A Lamusi','M',23,170,60,'China','CHN','2012 Summer',2012,'Summer','London','Judo','Judo Men''s Extra-Lightweight',NULL),
 (5,'Christine Jacoba Aaftink','F',21,185,82,'Netherlands','NED','1988 Winter',1988,'Winter','Calgary','Speed Skating','Speed Skating Women''s 500 metres',NULL),
 (5,'Christine Jacoba Aaftink','F',21,185,82,'Netherlands','NED','1988 Winter',1988,'Winter','Calgary','Speed Skating','Speed Skating Women''s 1,000 metres',NULL),
+
+4. Deciding on Columns
+
+SELECT DISTINCT
+id,
+name
+FROM olympicstablefinal;
+SELECT
+id,
+COUNT(DISTINCT 'name') as 'names'
+FROM olympicstablefinal
+GROUP BY id
+HAVING COUNT(DISTINCT 'name')>1;
+SELECT id, name, sex, 
+COUNT(DISTINCT age) as ages
+FROM olympicstablefinal
+GROUP BY id, name,
+sex
+HAVING COUNT(DISTINCT age)>1;
+
+5. Creating ID columns
+
+// adding an ID number to each unique row 
+SELECT 
+ROW_NUMBER() OVER(ORDER BY team) as team_id,
+team,
+noc
+FROM (
+	SELECT DISTINCT 
+	team,
+	noc
+	FROM olympicstablefinal
+) as teams;
+
+
+6. Create tables and Insert Data
+
+
+// dimensions // 
+--teams--
+CREATE TABLE teams (
+  team_id INT,
+   team VARCHAR(50),
+  noc VARCHAR(10)
+);
+--athletes--
+CREATE TABLE athletes (
+  athlete_id INT,
+   name VARCHAR(100),
+  sex VARCHAR(10),
+  age INT,
+  weight int
+);
+--games--
+CREATE TABLE games (
+ year INT,
+   games VARCHAR(100),
+  season VARCHAR(20),
+  city VARCHAR(20)
+);
+--events--
+CREATE TABLE events (
+event_id int,
+ sport VARCHAR(50),
+   event VARCHAR(100)
+);
+// facts //
+--results--
+CREATE TABLE results (
+event_id int,
+athlete_id int,
+athlete_age int,
+team_id int,
+games_id int,
+medal VARCHAR(10)
+);
+
+
+5. Set Primary and Foreign Keys
+
+-- Add primary key
+ALTER TABLE athletes ADD PRIMARY KEY(athlete_id);
+
+-- Add foreign key
+ALTER TABLE results ADD FOREIGN KEY (athlete_id) REFERENCES athletes(athlete_id);
+
+6. Create Entity Relationship Diagram:
+
+*Created in Dbeaver*
+
