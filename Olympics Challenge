@@ -1,20 +1,33 @@
 1. Create Your Database/Schema
 
-CREATE DATABASE olympics;
+CREATE DATABASE olympicsdatabase;
+
+USE olympicsdatabase;
 
 2. Create a Staging Table
 
-create table Olympicstable3
-(ID int,
-'Name' varchar(255),
-'Sex' varchar(255),
-'Age' int);
-etc....
+CREATE TABLE `olympicstablefinal` (
+  `ID` BIGINT,
+  `Name` VARCHAR(1024),
+  `Sex` VARCHAR(1024),
+  `Age` BIGINT NULL,
+  `Height` BIGINT NULL,
+  `Weight` DOUBLE NULL,
+  `Team` VARCHAR(1024),
+  `NOC` VARCHAR(1024),
+  `Games` VARCHAR(1024),
+  `Year` BIGINT,
+  `Season` VARCHAR(1024),
+  `City` VARCHAR(1024),
+  `Sport` VARCHAR(1024),
+  `Event` VARCHAR(1024),
+  `Medal` VARCHAR(1024) NULL
+);
 
 3. Insert Data
 
 **Snipped**
-INSERT INTO `olympicstable3` (`ID`,`Name`,`Sex`,`Age`,`Height`,`Weight`,`Team`,`NOC`,`Games`,`Year`,`Season`,`City`,`Sport`,`Event`,`Medal`)
+INSERT INTO `olympicstablefinal` (`ID`,`Name`,`Sex`,`Age`,`Height`,`Weight`,`Team`,`NOC`,`Games`,`Year`,`Season`,`City`,`Sport`,`Event`,`Medal`)
 VALUES
 (1,'A Dijiang','M',24,180,80,'China','CHN','1992 Summer',1992,'Summer','Barcelona','Basketball','Basketball Men''s Basketball',NULL),
 (2,'A Lamusi','M',23,170,60,'China','CHN','2012 Summer',2012,'Summer','London','Judo','Judo Men''s Extra-Lightweight',NULL),
