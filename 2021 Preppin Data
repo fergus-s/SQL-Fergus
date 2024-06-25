@@ -73,4 +73,50 @@ group by store, customer_type, product_type
 // Week 4
 
 
+WITH unioned AS (
+     SELECT *, 'BIRMINGHAM' AS store FROM PD2021_WK03_BIRMINGHAM
+    UNION ALL
+    SELECT *, 'LEEDS' AS store FROM PD2021_WK03_LEEDS
+    UNION ALL
+    SELECT *, 'LONDON' AS store FROM PD2021_WK03_LONDON
+    UNION ALL
+    SELECT *, 'MANCHESTER' AS store FROM PD2021_WK03_MANCHESTER
+    UNION ALL
+    SELECT *, 'YORK' AS store FROM PD2021_WK03_YORK
+),
+pivoted as (
+SELECT *
+FROM unioned
+UNPIVOT (
+    sales FOR product IN (
+        "New_-_Saddles", 
+        "New_-_Mudguards",
+        "New_-_Wheels",
+        "New_-_Bags",
+        "Existing_-_Saddles",
+        "Existing_-_Mudguards",
+        "Existing_-_Wheels",
+        "Existing_-_Bags"
+    )
+)
+),
+split_data as (
+select *, 
+TRIM(SPLIT_PART(product, '_-_', 1)) AS customer_type,
+ TRIM(SPLIT_PART(product, '_-_', 2)) AS product_type,
+date_part('quarter', "Date") as quarter
+from pivoted
+),
+target_store as (
+select store, quarter, PD2021_WK04_TARGETS."Target" as targets,
+sum(sales) as products_sold
+from split_data
+left join PD2021_WK04_TARGETS on split_data.quarter = PD2021_WK04_TARGETS."Quarter"
+and split_data.store = PD2021_WK04_TARGETS."Store"
+group by store, quarter, "Target"
+)
+select *,
+products_sold - targets as Variance_to_Target,
+ROW_NUMBER() OVER (PARTITION BY store ORDER BY variance_to_target ASC) as rank
+from target_store
 
