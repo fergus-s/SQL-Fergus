@@ -1,0 +1,19 @@
+// Week 1
+
+
+select *,
+"pupil last name" || ', ' || "pupil first name" as pupil_name,
+case 
+    when "Parental Contact" = 1 then "Parental Contact Name_1"
+    when "Parental Contact" = 2 then "Parental Contact Name_2"
+    else 'No Parent' end as parent_first_name,
+"pupil last name" || ', ' || parent_first_name as parent_name,
+parent_first_name || '.' || "pupil last name" || '@' || "Preferred Contact Employer" || '.com' as email,
+case   
+        WHEN "Date of Birth" BETWEEN '2014-09-01' AND '2015-08-31' THEN 'Year 1'
+        WHEN "Date of Birth" BETWEEN '2014-08-31' AND '2013-09-01' THEN 'Year 2'
+        WHEN "Date of Birth" BETWEEN '2013-08-31' AND '2012-09-01' THEN 'Year 3'
+        WHEN "Date of Birth" BETWEEN '2012-08-31' AND '2011-09-01' THEN 'Year 4'
+        ELSE 'Older'
+    END AS academic_year
+from PD2022_WK01
