@@ -1,0 +1,73 @@
+// Week 1
+
+select *,
+ TRIM(SPLIT_PART(store_bike, '-', 1)) AS county,
+ TRIM(SPLIT_PART(store_bike, '-', 2)) AS type,
+ date_part('quarter', date) as quarter,
+ date_part('day', date) as day_of_month
+from PD2021_WK01
+where order_id > 10
+
+
+// Week 2 
+
+with table_1 as
+(
+select *,
+regexp_substr(model, '[A-Za-z]+') as brand,
+quantity * value_per_bike as order_value,
+datediff('day', to_date(order_date, 'DD/MM/YYYY'), to_date(shipping_date, 'DD/MM/YYYY')) as days_to_ship
+from PD2021_WK02_BIKE_SALES
+)
+select brand, store,
+sum(quantity) as quantity, 
+//avg(value_per_bike) as avg_bike_value,
+round(sum(order_value),1) as total_value,
+round(avg(days_to_ship),1) as avg_ship_days
+from table_1
+group by brand, store;
+
+
+// Week 3
+
+WITH unioned AS (
+     SELECT *, 'BIRMINGHAM' AS store FROM PD2021_WK03_BIRMINGHAM
+    UNION ALL
+    SELECT *, 'LEEDS' AS store FROM PD2021_WK03_LEEDS
+    UNION ALL
+    SELECT *, 'LONDON' AS store FROM PD2021_WK03_LONDON
+    UNION ALL
+    SELECT *, 'MANCHESTER' AS store FROM PD2021_WK03_MANCHESTER
+    UNION ALL
+    SELECT *, 'YORK' AS store FROM PD2021_WK03_YORK
+),
+pivoted as (
+SELECT *
+FROM unioned
+UNPIVOT (
+    sales FOR product IN (
+        "New_-_Saddles", 
+        "New_-_Mudguards",
+        "New_-_Wheels",
+        "New_-_Bags",
+        "Existing_-_Saddles",
+        "Existing_-_Mudguards",
+        "Existing_-_Wheels",
+        "Existing_-_Bags"
+    )
+)
+),
+split_data as (
+select *, 
+TRIM(SPLIT_PART(product, '_-_', 1)) AS customer_type,
+ TRIM(SPLIT_PART(product, '_-_', 2)) AS product_type,
+//date_part('day', date) as quarter - date not being recognised??
+from pivoted
+)
+select store, customer_type, product_type,
+sum(sales) as products_sold
+from split_data
+group by store, customer_type, product_type
+
+
+// Week 4
