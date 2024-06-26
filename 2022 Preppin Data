@@ -17,3 +17,59 @@ case
         ELSE 'Older'
     END AS academic_year
 from PD2022_WK01
+
+
+// Week 3
+
+
+with main_table as (
+select "id", "pupil first name", "pupil last name",
+"gender", "Date of Birth", "Maths", "English", "Spanish",
+"Science", "Art", "History", "Geography"
+from PD2022_WK01
+join PD2022_WK03 on PD2022_WK01."id" = pd2022_wk03."Student ID"
+),
+pivot_subject as ( 
+select *
+from main_table
+UNPIVOT (
+    Score FOR Subject IN (
+        "Maths",
+        "English", 
+        "Spanish",
+        "Science", 
+        "Art", 
+        "History", 
+        "Geography"
+    )
+)
+),
+student_avg as (
+select "id",
+        avg("SCORE") as avg_score
+from pivot_subject
+group by "id"
+),
+student_pass as (select * ,
+    case 
+    when score >= 75 then 'Pass'
+    else 'Fail'
+    end as "Pass / Fail"
+from pivot_subject
+),
+pass_count as (
+select student_pass."id",
+count_if("Pass / Fail" = 'Pass') as Passed_Subjects,
+from student_pass
+group by student_pass."id"
+)
+
+select student_pass."id",
+pivot_subject."gender", round("AVG_SCORE",1) as students_avg_score,
+pass_count."PASSED_SUBJECTS"
+from student_pass
+inner join pivot_subject on student_pass."id" = pivot_subject."id"
+inner join student_avg on student_pass."id" = student_avg."id"
+inner join pass_count on student_pass."id" = pass_count."id"
+group by student_pass."id", pivot_subject."gender", "AVG_SCORE",
+pass_count."PASSED_SUBJECTS"
